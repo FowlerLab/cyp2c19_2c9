@@ -1,0 +1,22 @@
+Standard position,Amino acid,Conservation,Known function
+96,F,0.8,Heme interaction/incorporation
+100,R,0.84,"Heme propionate interaction, electron transfer"
+265,G,0.85,Structurally significant residue
+268,T,0.87,Active site threonine
+284,P,0.84,Structurally significant residue
+293,E,0.95,Function not described in literature
+320,E,0.99,ExxR motif
+323,R,0.99,ExxR motif
+333,R,0.65,Heme propionate interaction
+350,G,0.74,Structurally significant residue
+374,F,0.94,Function not described in literature
+376,P,0.95,Structurally significant residue
+378,R,0.86,Structure stabilisation
+392,P,0.82,Structurally significant residue
+393,F,0.98,Heme-ligand cysteine interaction
+394,G,0.61,Structurally significant residue
+396,G,0.99,Structurally significant residue
+398,R,0.92,Heme propionate interaction
+400,C,0.99,Heme ligand
+402,G,0.94,Structurally significant residue
+406,A,0.72,Stability of CYP101

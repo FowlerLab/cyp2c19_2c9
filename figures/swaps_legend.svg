@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' width='360.00pt' height='72.00pt' viewBox='0 0 360.00 72.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+    .svglite text {
+      white-space: pre;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: none;'/>
+<defs>
+  <clipPath id='cpMC4wMHwzNjAuMDB8MC4wMHw3Mi4wMA=='>
+    <rect x='0.00' y='0.00' width='360.00' height='72.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHwzNjAuMDB8MC4wMHw3Mi4wMA==)'>
+<text x='57.78' y='42.44' style='font-size: 18.00px; font-family: "Arial";' textLength='115.03px' lengthAdjust='spacingAndGlyphs'>Template CYP</text>
+<rect x='182.33' y='28.07' width='15.86' height='15.86' style='stroke-width: 1.07; stroke: none; stroke-linecap: square; stroke-linejoin: miter; fill: #D55E00;' />
+<rect x='243.22' y='28.07' width='15.86' height='15.86' style='stroke-width: 1.07; stroke: none; stroke-linecap: square; stroke-linejoin: miter; fill: #0072B2;' />
+<text x='207.87' y='41.15' style='font-size: 14.40px; font-family: "Arial";' textLength='26.41px' lengthAdjust='spacingAndGlyphs'>2C9</text>
+<text x='268.76' y='41.15' style='font-size: 14.40px; font-family: "Arial";' textLength='34.42px' lengthAdjust='spacingAndGlyphs'>2C19</text>
+</g>
+</svg>

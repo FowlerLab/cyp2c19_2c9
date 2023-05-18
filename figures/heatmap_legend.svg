@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' class='svglite' width='144.00pt' height='288.00pt' viewBox='0 0 144.00 288.00'>
+<defs>
+  <style type='text/css'><![CDATA[
+    .svglite line, .svglite polyline, .svglite polygon, .svglite path, .svglite rect, .svglite circle {
+      fill: none;
+      stroke: #000000;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-miterlimit: 10.00;
+    }
+    .svglite text {
+      white-space: pre;
+    }
+  ]]></style>
+</defs>
+<rect width='100%' height='100%' style='stroke: none; fill: none;'/>
+<defs>
+  <clipPath id='cpMC4wMHwxNDQuMDB8MC4wMHwyODguMDA='>
+    <rect x='0.00' y='0.00' width='144.00' height='288.00' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMC4wMHwxNDQuMDB8MC4wMHwyODguMDA=)'>
+<image width='17.28' height='86.40' x='27.65' y='44.45' preserveAspectRatio='none' xlink:href='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEsCAYAAAACUNnVAAAA40lEQVQ4jaWR0RHDMAhDhdIhukO3735B/UjsGILd3vWHs5B4OA7ez5doDwP5MNC2UHhJ3uXQOyTbGENkACTj6PHWKylkDfiCooG0fr8CChI0aycYa8O6m+TUKOW1qNi2zp3GVhuZVwI2EGatoDiZgaqMWfiS5xgWkVt4xQMM1C8rZzuyAVACKLQCaZQSWm4IC0Qcu+UaJe/oJ0DF8gRVsTzlFKHLL4rXcKkVj/JyPcrv4f0P8jHrRXjp7nHRPnN3qf0Z7/+ou6fRn7NLV+95AHjB84LiHgBpbCo9QYteJcfHHnsfCctVmJdPxIoAAAAASUVORK5CYII='/>
+<rect x='27.65' y='44.45' width='17.28' height='86.40' style='stroke-width: 0.38; stroke: #333333;' />
+<text x='53.62' y='135.86' style='font-size: 14.40px; font-family: "Arial";' textLength='20.01px' lengthAdjust='spacingAndGlyphs'>0.0</text>
+<text x='53.62' y='114.33' style='font-size: 14.40px; font-family: "Arial";' textLength='20.01px' lengthAdjust='spacingAndGlyphs'>0.5</text>
+<text x='53.62' y='92.80' style='font-size: 14.40px; font-family: "Arial";' textLength='20.01px' lengthAdjust='spacingAndGlyphs'>1.0</text>
+<text x='53.62' y='71.27' style='font-size: 14.40px; font-family: "Arial";' textLength='20.01px' lengthAdjust='spacingAndGlyphs'>1.5</text>
+<text x='53.62' y='49.74' style='font-size: 14.40px; font-family: "Arial";' textLength='20.01px' lengthAdjust='spacingAndGlyphs'>2.0</text>
+<text x='27.65' y='14.04' style='font-size: 18.00px; font-family: "Arial";' textLength='89.06px' lengthAdjust='spacingAndGlyphs'>abundance</text>
+<text x='27.65' y='33.48' style='font-size: 18.00px; font-family: "Arial";' textLength='44.01px' lengthAdjust='spacingAndGlyphs'>score</text>
+<line x1='27.65' y1='130.71' x2='31.10' y2='130.71' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='27.65' y1='109.18' x2='31.10' y2='109.18' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='27.65' y1='87.65' x2='31.10' y2='87.65' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='27.65' y1='66.12' x2='31.10' y2='66.12' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='27.65' y1='44.59' x2='31.10' y2='44.59' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='41.47' y1='130.71' x2='44.93' y2='130.71' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='41.47' y1='109.18' x2='44.93' y2='109.18' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='41.47' y1='87.65' x2='44.93' y2='87.65' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='41.47' y1='66.12' x2='44.93' y2='66.12' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<line x1='41.47' y1='44.59' x2='44.93' y2='44.59' style='stroke-width: 0.38; stroke: #333333; stroke-linecap: butt;' />
+<text x='27.65' y='181.60' style='font-size: 18.00px; font-family: "Arial";' textLength='27.99px' lengthAdjust='spacingAndGlyphs'>WT</text>
+<circle cx='36.29' cy='201.21' r='3.56' style='stroke-width: 0.71; stroke: none; fill: #000000;' />
+<text x='27.65' y='260.60' style='font-size: 18.00px; font-family: "Arial";' textLength='61.01px' lengthAdjust='spacingAndGlyphs'>missing</text>
+<rect x='27.79' y='271.70' width='17.00' height='17.00' style='stroke-width: 0.21; stroke: #7F7F7F; stroke-linecap: square; stroke-linejoin: miter; fill: #7F7F7F;' />
+</g>
+</svg>
