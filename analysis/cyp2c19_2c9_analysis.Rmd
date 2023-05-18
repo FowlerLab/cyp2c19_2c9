@@ -2083,12 +2083,11 @@ CYP2C19_clin_full <- CYP2C19_clin_full %>%
     (is.na(`VEP Annotation`) & !is.na(abundance_score)) ~ "dms_only"
   ))
 
-write_csv(CYP2C19_clin_full, "../data/CYP2C19_clinical_data.csv")
 ```
 
 ## gnomAD
 ```{r}
-CYP2C19_clin <- read_csv("../data/CYP2C19_clinical_data.csv") %>%   
+CYP2C19_clin_full <- CYP2C19_clin_full %>% 
   mutate(classification = ifelse(is.na(classification),
                                  case_when(str_detect(clinical_functional_annotation, "no_annotation") ~ "no_annotation",
                                            str_detect(clinical_functional_annotation, "Decreased") ~ "decreased"),
@@ -2102,13 +2101,13 @@ class_order <- list("nonsense-like" = "nonsense-like",
                  "possibly_wt-like" = "possibly wt-like",
                  "wt-like"="wt-like")
 
-CYP2C19_clin_counts <- CYP2C19_clin %>% 
+CYP2C19_clin_counts <- CYP2C19_clin_full %>% 
   group_by(classification, in_df) %>% 
   filter(in_df != "dms_only") %>% 
   summarise(count=n()) %>% 
   mutate(classification = factor(classification, levels=names(class_order)))
 
-CYP2C19_clin_counts_total <- CYP2C19_clin %>% 
+CYP2C19_clin_counts_total <- CYP2C19_clin_full %>% 
   filter(in_df != "dms_only") %>% 
   group_by(classification) %>% 
   summarise(count=n())
