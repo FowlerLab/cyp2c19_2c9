@@ -37,6 +37,8 @@ library(patchwork)
 if (!require(zoo)) install.packages('zoo')
 library(zoo)
 
+if (!require(ggpointdensity)) install.packages('ggpointdensity')
+library(ggpointdensity)
 
 ## ggpubr 0.4.0 for correlation stats
 if (!require(ggpubr)) install.packages('ggpubr')
@@ -559,11 +561,11 @@ CYP2C19_class_counts <- CYP2C19_data %>%
             type="missense")
   
 
-class_labs <- list("nonsense-like" = "nonsense-like",
-                   "possibly_nonsense-like" = "possibly nonsense-like",
-                   decreased="decreased",
-                   possibly_decreased = "possibly decreased",
-                   "possibly_wt-like" = "possibly WT-like",
+class_labs <- list("nonsense-like" = "Nonsense-like",
+                   "possibly_nonsense-like" = "Possibly nonsense-like",
+                   decreased="Decreased",
+                   possibly_decreased = "Possibly decreased",
+                   "possibly_wt-like" = "Possibly WT-like",
                    "wt-like" = "WT-like")
 
 class_order <- c("nonsense-like", "possibly_nonsense-like", "decreased", "possibly_decreased", "possibly_wt-like", "wt-like")
@@ -576,17 +578,14 @@ missense_counts_plt <- ggplot(CYP2C19_class_counts, aes(x=classification, y=coun
   geom_text(aes(x=classification, label=count),
             vjust=-0.25,
             size=6)+
-  geom_text(aes(x=classification, label=round(proportion, 2)),
-            vjust=1.5,
-            color="white",
-            size=4.5) +
   scale_x_discrete(labels=class_labs)+
   ylim(0,3350)+
-  labs(title="Missense variants")+
-  # theme_minimal(base_size=22)+
+  labs(title="Missense variants",
+       y="Count",
+       x="Abundance class")+
   theme(axis.text.x = element_text(angle = 45, hjust=1),
         plot.title = element_text(hjust=0.5))
-
+missense_counts_plt
 
 
 
@@ -602,20 +601,11 @@ group.colors <- c(missense = "#ababab", nonsense = "#ff9696", synonymous ="#7377
 lib_density_plt <- ggplot((comb_scores %>% filter(type != "wt")), aes(x=abundance_score, fill=type, after_stat(scaled)))+
   geom_density(color = "black", alpha=0.55)+
   scale_fill_manual(values=group.colors)+
-  geom_vline(xintercept=synonymous_lowest,
-             linetype="dashed",
-             linewidth=1,
-             color='blue')+
-  geom_vline(xintercept=nonsense_highest,
-             linetype="dashed",
-             linewidth=1,
-             color='red')+
-  labs(y="Density", x="Abundance Score",
-       fill = "Variant Type")+
-  # theme_minimal(base_size=26) +
+  labs(y="Density", x="Abundance score",
+       fill = "Variant type")+
   theme(legend.title=element_blank(),
         legend.margin=margin(t=0, unit='cm'),
-        legend.position = "top")
+        legend.position = "bottom")
 lib_density_plt
 ggsave("../figures/missense_density.png", height=6, width = 9, plot=lib_density_plt)
 
@@ -632,7 +622,7 @@ lib_histo_plt <- ggplot((CYP2C19_data %>% filter(type == "missense")), aes(x=abu
            linetype="dashed",
            linewidth=1)+
   # scale_fill_discrete(name="Classification", )+
-  labs(y="Density", x="Abundance Score")+
+  labs(y="Density", x="Abundance score")+
   theme_light(base_size=18)
 
 
@@ -680,14 +670,13 @@ validation_plt <- ggplot(comb_df, aes(x=abundance_score, y=geomean_norm, label=v
   geom_errorbar(aes(ymin=geomean_norm - sd_valid, ymax = geomean_norm + sd_valid), color="#0072B2")+
   geom_errorbarh(aes(xmin=abundance_score - abundance_sd, xmax=abundance_score +abundance_sd), color="#0072B2")+
   stat_cor(method="pearson",
-           size=7)+
+           size=6)+
   geom_smooth(method="lm",
               inherit.aes=FALSE,
               aes(x=abundance_score, y=geomean_norm))+
   geom_text_repel()+
-  # theme_light(base_size = 18)+
   labs(y="GFP:mCherry\n fluorescence",
-       x="Abundance Score")+
+       x="Abundance score")+
   theme(axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 validation_plt
 ggsave("../figures/validation.png", height=6, width=6, plot=validation_plt)
@@ -717,10 +706,10 @@ ggsave("../figures/r144h_validation/r144h_corrplot.png", height=4, width=5)
 
 # Combine Figure 1 plots
 ```{r}
-comb_fig1 <- lib_density_plt+validation_plt+missense_counts_plt+plot_layout(widths=c(1, 1, 1.5))
-
-ggsave(plot=comb_fig1, "../figures/comb_fig1.svg", height=6, width=16)
-ggsave(plot=comb_fig1, "../figures/comb_fig1.png", height=6, width=16)
+comb_fig1 <- lib_density_plt+validation_plt+missense_counts_plt+plot_layout(widths=c(1, 1, 1.25))
+comb_fig1
+ggsave(plot=comb_fig1, "../figures/fig1.svg", height=7, width=16)
+ggsave(plot=comb_fig1, "../figures/fig1.png", height=7, width=16)
 ```
 
 
@@ -977,7 +966,6 @@ set.seed(1234)
 
 hclust_gricman <- hclust(dist(clustering_mat), method="complete")
 dendro <- as.dendrogram(hclust_gricman) 
-dendro %>% plot(horiz=TRUE)
 aa_order = c("A","V","I","L","M","F","Y","W","S","T","N","Q","C","G","P","R","H","K","D","E")
 
 cutree_gricman_df <- data.frame(cluster = cutree(tree=hclust_gricman, k=5)) %>% 
@@ -1000,27 +988,22 @@ annotation_rows <- annotation_df %>% select(position, pos_cons) %>%
   column_to_rownames("pos_cons")
 
 
-dendrogram <- ggdendrogram(dendro)+
-  geom_segment()
-
+dendrogram <- ggdendrogram(dendro)
 ggsave(plot=dendrogram, "../figures/cyp2c19_fig2_dendrogram.png", height=5, width=14)
 ggsave(plot=dendrogram, "../figures/cyp2c19_fig2_dendrogram.svg", height=5, width=14)
 ```
 
 
 ### Plot pheatmap
-
 ```{r}
 breaks <- seq(0, 2, by=0.01)
 colors <- colorRampPalette(colors=c("blue", "white", "red"))(length(breaks))
-cons_palette <- list(amino_acid = "#E69F00",
+cons_palette <- list(conservation = c(amino_acid = "#E69F00",
                 aromatic="#56B4E9",
                 positively_charged ="#009E73",
                 negatively_charged  = "#F0E442",
                 hydrogen_bonding="#0072B2",
-                hydrophobic = "#CC79A7")
-
-
+                hydrophobic = "#CC79A7"))
 
 vert_pheatmap <- pheatmap(clustering_mat,
          cluster_rows=TRUE,
@@ -1036,6 +1019,7 @@ vert_pheatmap <- pheatmap(clustering_mat,
          na_col="grey50",
          # angle_col = 315,
          fontsize=14)
+# vert_pheatmap
 ```
 
 ```{r}
@@ -1056,10 +1040,42 @@ save_pheatmap_svg <- function(x, filename, width=10, height=5) {
 save_pheatmap_svg(vert_pheatmap, "../figures/clustering_vertical.svg", width=8, height=10)
 ```
 
+## Median scores per cluster
+```{r}
+# Get cluster IDs in order
+mat.order <- cbind(clustering_mat[c(vert_pheatmap$tree_row[["order"]]),],cluster=cutree(vert_pheatmap$tree_row, k=5)[vert_pheatmap$tree_row[["order"]]])
+df.order <- data.frame(mat.order) %>% 
+  rownames_to_column(var="pos_cons") %>% 
+  select(pos_cons, cluster) %>% 
+  separate(pos_cons, into=c("position", "conservation"), sep="_") %>% 
+  select(-conservation) %>% 
+  mutate(position = as.integer(position))
+
+position_order <- df.order$position
+
+median_score_clusters <-comb_clustering %>% 
+  select(position, abundance_score) %>% 
+  group_by(position) %>% 
+  summarise(median_score = median(abundance_score))
+
+median_score_clusters_ordered <- left_join(df.order, median_score_clusters, by="position") %>% 
+  mutate(position = factor(position, levels=position_order))
+
+median_score_clusters_plot <- ggplot(median_score_clusters_ordered, aes(x=position, y=median_score))+
+  geom_point(size=3)+
+  facet_grid(cols= vars(cluster), scale="free", space="free")
+median_score_clusters_plot
+
+?facet_grid
+median_score_clusters_plot
+ggsave("../figures/median_score_clusters.png", height=3, width=20, plot=median_score_clusters_plot)
+ggsave("../figures/median_score_clusters.svg", height=3, width=20, plot=median_score_clusters_plot)
 
 
+```
 
-# multiDMS joint analysis of CYP2C19 and 2C9
+
+# Figure 3: multiDMS joint analysis of CYP2C19 and 2C9
 ## Define 2C9 WT sequence
 ```{r}
 ## WT CYP2C9 sequence
@@ -1104,15 +1120,28 @@ CYP2C19_2C9_data <- inner_join(CYP2C19_data_forComb, CYP2C9_data_forComb, by=c("
 ### Plot correlation
 ```{r}
 corrplot_2C19_2C9 <- ggplot(CYP2C19_2C9_data, aes(x=abundance_score_2C19, y=abundance_score_2C9))+
-  geom_point(alpha=0.15, size=3) +
+  geom_pointdensity(size=3) +
   geom_smooth(method="lm")+
   stat_cor(digits=3, size=6) +
-  labs(x="CYP2C19 Abundance Scores",
-       y="CYP2C9 Abundance Scores")+
+  labs(x="CYP2C19 Abundance scores",
+       y="CYP2C9 Abundance scores",
+       color="Count")+
+  scale_color_viridis_c()+
   theme(plot.margin = margin(0,1,1,0,unit="in"))
 
 corrplot_2C19_2C9
 
+# ggplot(CYP2C19_2C9_data, aes(x=abundance_score_2C19, y=abundance_score_2C9))+
+#   stat_density_2d_filled()+
+#   geom_smooth(method="lm")+
+#   stat_cor(digits=3, size=6) +
+#   labs(x="CYP2C19 Abundance scores",
+#        y="CYP2C9 Abundance scores",
+#        color="Count")+
+#   theme(plot.margin = margin(0,1,1,0,unit="in"))+
+#   scale_color_viridis_c()
+# 
+# ?geom_density2d
 
 ```
 
@@ -1957,15 +1986,6 @@ cyp2c9_to_cyp2c19 <- read_csv("../data/cyp2c9_to_2c19_241-288-289.csv") %>%
 cyp2c9_to_cyp2c19 <- cyp2c9_to_cyp2c19 %>% 
   separate(sample, into=c("well", "template_cyp", "sample"), sep="_")
 
-cyp2c9_to_cyp2c19$sample_list <- str_replace_all(cyp2c9_to_cyp2c19$sample, pattern="-", replacement=",")
-cyp2c9_to_cyp2c19$sample_list <- str_split(cyp2c9_to_cyp2c19$sample_list, pattern=",")
-
-num_vars=c()
-for(row in cyp2c9_to_cyp2c19$sample_list){
-  num_vars = c(num_vars, length(row))
-}
-
-cyp2c9_to_cyp2c19$num_vars = num_vars
 
 
 cyp2c9_to_cyp2c19_2c19_wt <- cyp2c9_to_cyp2c19$geometric_mean[which((cyp2c9_to_cyp2c19$sample == "WT") & cyp2c9_to_cyp2c19$template_cyp == "2C19")]
@@ -1978,9 +1998,23 @@ cyp2c9_to_cyp2c19 <- cyp2c9_to_cyp2c19 %>%
                                template_cyp == "2C9" ~ geometric_mean / cyp2c9_to_cyp2c19_2c9_wt))
 
 
-variant_order <- c("241-288-289", "288-289","241-289","241-288","289","288","241","WT")
-cyp2c9_to_cyp2c19 <- cyp2c9_to_cyp2c19 %>% 
-  mutate(sample = fct_relevel(sample, variant_order))
+template_2c9 <- cyp2c9_to_cyp2c19 %>% 
+  filter(template_cyp == "2C9")
+
+variant_order_2c9 <- unique(template_2c9$sample)
+
+template_2c9 <- template_2c9 %>% 
+  mutate(sample = fct_relevel(sample, variant_order_2c9))
+
+
+template_2c19 <- cyp2c9_to_cyp2c19 %>% 
+  filter(template_cyp == "2C19")
+
+variant_order_2c19 <- c("WT", "E241K", "V288E", "I289N", "E241K-V288E", "E241K-I289N", "V288E-I289N", "E241K-V288E-I289N")
+
+template_2c19 <- template_2c19 %>% 
+  mutate(sample = fct_relevel(sample, variant_order_2c19))
+
 
 ```
 
@@ -1989,43 +2023,43 @@ cyp2c9_to_cyp2c19 <- cyp2c9_to_cyp2c19 %>%
 colors <- list("2C9" = "#D55E00",
                "2C19" = "#0072B2")
 
-swaps_plot_legend <- ggplot(cyp2c9_to_cyp2c19, aes(x=fct_rev(sample), y=mean_norm, fill=template_cyp))+
-  geom_col(position="dodge")+
+swaps_plot_template_2c9<- ggplot(template_2c9, aes(x=sample, y=mean_norm))+
+  geom_col(position="dodge",
+           fill="#D55E00")+
   labs(y="Fluorescence\n(GFP:mCherry)",
-       x="Substituted position",
-       fill="Template CYP")+
-  facet_wrap(~ template_cyp)+
-  scale_fill_manual(values=colors)+
+       x="Variant")+
   theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
         legend.position = "top",
         strip.text = element_text(size=18))
+swaps_plot_template_2c9
 
-swaps_plot <- swaps_plot_legend+
-  theme(legend.position="none")
-# swaps_plot
+swaps_plot_template_2c19<- ggplot(template_2c19, aes(x=sample, y=mean_norm))+
+  geom_col(position="dodge",
+           fill="#0072B2")+
+  labs(y="Fluorescence\n(GFP:mCherry)",
+       x="Variant")+
+  theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
+        legend.position = "top",
+        strip.text = element_text(size=18))
+swaps_plot_template_2c19
 
-# ggsave("../figures/cyp2c9_to_cyp2c19/eachWt_norm.png", height=7, width=14, plot=swaps_plot)
-# ggsave("../figures/cyp2c9_to_cyp2c19/eachWt_norm.svg", height=7, width=14, plot=swaps_plot)
 
-swaps_legend <- cowplot::get_legend(swaps_plot_legend)
-
-ggsave("../figures/swaps_legend.png", height=1, width=5, plot=swaps_legend)
-ggsave("../figures/swaps_legend.svg", height=1, width=5, plot=swaps_legend)
-
+swaps_plot <- swaps_plot_template_2c19+swaps_plot_template_2c9
+swaps_plot
 ```
 
 # Assemble Fig 4
 ```{r}
 fig4_layout <- "
-  1111#
-  2222#
+  11111
+  22222
   #####
   #####
   33333
 "
 fig4 <- stacked/swaps_plot+
   plot_layout(design=fig4_layout)
-# fig4
+fig4
 ggsave("../figures/fig4.png", plot=fig4, height=16, width=14, unit="in")
 ggsave("../figures/fig4.svg", plot=fig4, height=16, width=14, unit="in")
 
@@ -2094,12 +2128,12 @@ CYP2C19_clin_full <- CYP2C19_clin_full %>%
                                  classification),
          type = ifelse(is.na(type), "missense", type))
 
-class_order <- list("nonsense-like" = "nonsense-like",
-                 "possibly_nonsense-like" = "possibly nonsense-like",
-                 "decreased"="decreased",
-                 "possibly_decreased" = "possibly decreased",
-                 "possibly_wt-like" = "possibly wt-like",
-                 "wt-like"="wt-like")
+class_order_capitol <- list("nonsense-like" = "Nonsense-like",
+                 "possibly_nonsense-like" = "Possibly nonsense-like",
+                 "decreased"="Decreased",
+                 "possibly_decreased" = "Possibly decreased",
+                 "possibly_wt-like" = "Possibly WT-like",
+                 "wt-like"="WT-like")
 
 CYP2C19_clin_counts <- CYP2C19_clin_full %>% 
   group_by(classification, in_df) %>% 
@@ -2112,23 +2146,53 @@ CYP2C19_clin_counts_total <- CYP2C19_clin_full %>%
   group_by(classification) %>% 
   summarise(count=n())
 
-custom_colorscale = c("nonsense-like" = "#BB00FF","possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_decreased" = "#b3d9ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D","increased" = "orange")
+custom_colorscale = c("nonsense-like" = "#BB00FF","possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_decreased" = "#b3d9ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
 
 ```
 ### plot
 ```{r}
 gnomad_plot <- ggplot(CYP2C19_clin_counts %>% filter(in_df == "both"), aes(x=classification, y=count))+
   geom_col(fill="#0072B2")+
-  geom_text(data=CYP2C19_clin_counts_total %>% filter(classification != "no_annotation"), aes(label=count),
-            vjust=-0.2)+
-  scale_x_discrete(labels = class_order)+
+  geom_text(data=CYP2C19_clin_counts %>% filter(in_df == "both"), aes(label=count),
+            vjust=-0.3,
+            size=5)+
+  scale_x_discrete(labels = class_order_capitol)+
+  labs(y="Count")+
   theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
-        axis.title = element_blank(),
+        axis.title.x = element_blank(),
         legend.position="top")
 
 gnomad_plot
   
 ggsave("../figures/clinical/gnomad_classification.png", height=7, width=5, plot=gnomad_plot)
+```
+
+## Analyze by frequency
+```{r}
+# custom_colorscale = c("nonsense-like" = "#BB00FF","possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_decreased" = "#b3d9ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
+# 
+# class_order <- list("nonsense-like" = "nonsense-like",
+#                  "possibly_nonsense-like" = "possibly nonsense-like",
+#                  "decreased"="decreased",
+#                  "possibly_decreased" = "possibly decreased",
+#                  "possibly_wt-like" = "possibly wt-like",
+#                  "wt-like"="WT-like")
+# 
+# 
+# CYP2C19_clin_full_maf <- CYP2C19_clin_full %>% 
+#   drop_na(`Allele Frequency`)
+# 
+# gnomad_maf_plot <- ggplot(CYP2C19_clin_full_maf,aes(x=abundance_score, y=`Allele Frequency`, color=classification))+
+#   geom_point(size=3, alpha=0.5)+
+#   geom_smooth(method="lm", inherit.aes=FALSE, aes(x=abundance_score, y=`Allele Frequency`))+
+#   stat_cor(inherit.aes=FALSE, aes(x=abundance_score, y=`Allele Frequency`),
+#            size=5)+
+#   scale_color_manual(values=custom_colorscale, labels=class_order)+
+#   # scale_x_discrete(labels=class_order)+
+#   scale_y_log10()+
+#   labs(x="Abundance score")
+# gnomad_maf_plot
+# ggsave("../figures/clinical/gnomad_maf.png", height=7, width=5, plot=gnomad_maf_plot)
 ```
 
 
@@ -2140,7 +2204,7 @@ CYP2C19_stars <- CYP2C19_clin %>% drop_na(star_allele) %>% unique()
 
 
 ```{r}
-custom_colorscale = list("possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
+custom_colorscale_star = list("possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
 
 set.seed(12346)
 star_plot <- ggplot(CYP2C19_stars, aes(x=`Allele Clinical Functional Status (Required)`, y=abundance_score, color=classification, group=classification))+
@@ -2151,10 +2215,11 @@ star_plot <- ggplot(CYP2C19_stars, aes(x=`Allele Clinical Functional Status (Req
             color="black",
             position=position_dodge2(width=0.3))+
   ylim(0,1.1)+
-  scale_color_manual(values=custom_colorscale)+
+  scale_color_manual(values=custom_colorscale_star)+
   labs(y="Abundance score")+
-  theme(axis.text.x = element_text(angle=45, vjust=0.5),
-        axis.title.x = element_blank())
+  theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1),
+        axis.title.x = element_blank(),
+        legend.position = "none")
 star_plot
 ggsave("../figures/cpic_classification_dots.png", height=8,width=10, plot=star_plot)
 
@@ -2163,14 +2228,15 @@ ggsave("../figures/cpic_classification_dots.png", height=8,width=10, plot=star_p
 
 ## Assembled Fig 5
 ```{r}
-fig5 <- star_plot+gnomad_plot
+fig5 <- star_plot+gnomad_plot+plot_layout(guides="collect")
+fig5
 
 ggsave(plot=fig5, "../figures/fig5.png", height=7, width=12)
 ggsave(plot=fig5, "../figures/fig5.svg", height=7, width=12)
 ```
 
 
-# Weinshilboum comparison
+## Weinshilboum comparison
 ```{r}
 scores <- read_csv("../data/all_samples_scores.csv") %>% 
   select(replicate, sort,parsed_var, weighted_average)
@@ -2242,3 +2308,9 @@ ggplot(wein_comparison, aes(x=wa_mean, y=abundance_score_wein))+
 ggsave("../figures/dotplots/wein_comparison.png", height=6, width=6)
 
 ```
+
+```{r}
+nelson_df <- read_tsv("../data/Nelson_Science_data_table_S2.txt") #%>% 
+  filter(GENE == "CYP2C19")
+```
+
