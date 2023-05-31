@@ -721,7 +721,7 @@ ggsave(plot=comb_fig1, "../figures/fig1.png", height=7, width=16)
 ```
 
 
-# Heatmaps
+# Figure 2
 ## 2C19 secondary structure
 ```{r Structure_ploy, warning=FALSE}
 # Plot secondary structure schematic, structure annotations from Reynald 2012 structure paper and Mustafa 2019
@@ -965,6 +965,42 @@ comb_clustering_wide <- comb_clustering_wide %>%
   column_to_rownames(var="pos_cons")
 
 clustering_mat = data.matrix(comb_clustering_wide)
+```
+
+## Count loss of abundance
+```{r}
+cyp2c19_data <- read_csv("../../../sequencing/all_samples/data/CYP2C19_data.csv") %>%
+  filter(type != "syn")
+
+countloss <- left_join(wt_CYP2C19_aa_cons_full %>% select(-abundance_score,-start, -end), cyp2c19_data, by=c("position"))
+
+countloss_nodups <- countloss %>% 
+  # select(position, conservation, abundance_score, start, end) %>% 
+  unique() %>% 
+  group_by(position) %>% 
+  mutate(duplicate = case_when(n() == 2 & conservation == "amino_acid" ~ "keep_dup",
+                               n() == 2 & conservation != "amino_acid" ~ "toss_dup",
+                               TRUE ~ "not_dup")) %>% 
+  filter(duplicate != "toss_dup") 
+
+countloss_nodups_class <- countloss_nodups %>% 
+  mutate(classification = case_when(CYP2C19_start_prop == CYP2C19_end_prop ~ "same_prop",
+                                    CYP2C19_start_prop != CYP2C19_end_prop & abundance_score < synonymous_lowest[[1]] ~ "decreased",
+                                    TRUE ~ "not_decreased"))
+countloss_nodups_class_counts <- countloss_nodups_class %>% 
+  group_by(position, classification) %>% 
+  summarise(count = n())
+
+countloss_nodups_class_counts_wide <- countloss_nodups_class_counts %>% 
+  pivot_wider(names_from = classification, values_from = count) %>% 
+    mutate(decreased = replace_na(decreased, 0),
+         not_decreased = replace_na(not_decreased, 0),
+         same_prop = replace_na(same_prop, 0),
+         total = decreased+not_decreased) %>% 
+  mutate(frac_loss = decreased / total)
+
+(countloss_nodups_class_counts_wide$frac_loss < 0.6)
+print(paste0(nrow(countloss_nodups_class_counts_wide %>% filter(frac_loss > 0.65)), " sites have more than 65% variants with decreased abundance when substituted with an amino acid of a different biophysical type"))
 ```
 
 
