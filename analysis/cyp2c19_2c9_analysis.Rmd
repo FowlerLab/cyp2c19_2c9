@@ -150,6 +150,8 @@ scores <- scores %>%
   mutate(position = case_when(type == "syn" ~ ceiling(aa_loc/3),
                               TRUE ~ aa_loc)) %>% 
   select(-aa_loc)
+
+
 ```
 
 
@@ -546,7 +548,6 @@ comb_scores <- scores_reps %>%
   select(-aa_loc)
 
 CYP2C19_data_detailed <- left_join(comb_scores, scores_reps_untidy, by=c("variant", "type"))
-
 ```
 
 # Classification with CIs
@@ -584,6 +585,11 @@ CYP2C19_data_detailed <- CYP2C19_data_detailed %>%
 
 write_csv(CYP2C19_data_detailed, "../data/CYP2C19_data.csv")
 
+```
+
+## Import processed data
+```{r}
+CYP2C19_data <- read_csv("../data/CYP2C19_data.csv")
 ```
 
 
@@ -632,7 +638,7 @@ ggsave("../figures/CYP2C19_classification_counts.png", height=6, width =6, plot 
 ```{r}
 ## Density
 
-group.colors <- c(missense = "#ababab", nonsense = "#ff9696", synonymous ="#7377ff")
+group.colors <- c(missense = "#ababab", nonsense = "#7377ff", synonymous ="#ff9696")
 
 lib_density_plt <- ggplot((comb_scores %>% filter(type != "wt")), aes(x=abundance_score, fill=type, after_stat(scaled)))+
   geom_density(color = "black", alpha=0.55)+
@@ -644,14 +650,32 @@ lib_density_plt <- ggplot((comb_scores %>% filter(type != "wt")), aes(x=abundanc
         legend.position = "bottom")
 lib_density_plt
 ggsave("../figures/missense_density.png", height=6, width = 9, plot=lib_density_plt)
+ggsave("../figures/missense_density.svg", height=6, width = 9, plot=lib_density_plt)
+
 
 
 ## Classification Histogram 
-custom_colorscale = c("nonsense-like" = "#BB00FF","possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_decreased" = "#b3d9ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
-class_names <- c("nonsense-like" = "nonsense-like","possibly_nonsense-like" = "possibly nonsense-like","decreased" = "decreased","possibly_decreased" = "possibly decreased","possibly_wt-like" = "possibly WT-like","wt-like" = "WT-like")
+custom_colorscale = c("nonsense" = "#ff9696", "synonymous" ="#7377ff","nonsense-like" = "#BB00FF","possibly_nonsense-like" = "#A47EFF","decreased" = "#3366ff","possibly_decreased" = "#b3d9ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
+class_names <- c("nonsense" = "nonsense", "synonymous" = "synonymous", "nonsense-like" = "nonsense-like","possibly_nonsense-like" = "possibly nonsense-like","decreased" = "decreased","possibly_decreased" = "possibly decreased","possibly_wt-like" = "possibly WT-like","wt-like" = "WT-like")
 
-lib_histo_plt <- ggplot((CYP2C19_data %>% filter(type == "missense")), aes(x=abundance_score, fill=classification))+
+CYP2C19_data_classification_syn_nonsense <- CYP2C19_data %>%
+  filter(type == "synonymous" | type == "nonsense") %>% 
+  mutate(classification = case_when(
+    type == "synonymous" ~ type,
+    type == "nonsense" ~ type
+  ))
+
+lib_histo_plt <- ggplot(CYP2C19_data,aes(x=abundance_score, fill=classification))+
   geom_histogram(color = "black")+
+  geom_freqpoly(data=(CYP2C19_data_classification_syn_nonsense %>% filter(type=="synonymous")),
+                linetype="dotdash",
+                color="red",
+                size=1.5)+
+  geom_freqpoly(data=(CYP2C19_data_classification_syn_nonsense %>% filter(type=="nonsense")),
+              linetype="dotdash",
+              # linewidth=0.5,
+              color="blue",
+              size=1.5)+
   scale_fill_manual(values=custom_colorscale,
                     labels=class_names)+
   geom_vline(xintercept=c(synonymous_lowest, nonsense_highest),
@@ -670,11 +694,7 @@ ggsave("../figures/missense_classification_histo.svg", height=8, width=10, plot=
 
 ## Weinshilboum comparison
 ```{r}
-scores <- read_csv("../data/all_samples_scores.csv") %>% 
-  select(replicate, sort,parsed_var, weighted_average)
-
-
-scores_wa <- scores %>% 
+scores_wa <- scores_cutoff %>% 
   group_by(parsed_var) %>% 
   summarise(wa_mean = mean(weighted_average),
             wa_sd = sd(weighted_average)) %>% 
@@ -717,18 +737,26 @@ scores_wa <- scores_wa %>%
 
 
 wein_scores <- read_csv("../data/weinshilboum_2c19_scores_table.csv") %>% 
-  select(variant = `Exact Amino acid`, abundance_score_wein = `Abundance score`)
-
-wein_scores$variant[which(wein_scores$variant == "V331I")] <- "I331V"
+  rename(abundance_score_wein = abundance_score,
+         abundance_sd_wein = abundance_sd)
 
 wein_comparison <- left_join(wein_scores, scores_wa, by="variant")
 
 ```
 
 ```{r}
-wein_plot <- ggplot(wein_comparison, aes(x=wa_mean, y=abundance_score_wein))+
+wein_outlier <- c("E444Q", "R125C", "N176S", "R73H")
+
+wein_plot <- ggplot(wein_comparison, aes(x=wa_mean, y=abundance_score_wein, label=variant))+
   geom_point(size=4,
              alpha=0.35)+
+  geom_linerange(aes(ymin = abundance_score_wein - abundance_sd_wein,
+                     ymax = abundance_score_wein + abundance_sd_wein),
+                 alpha=0.25)+
+  geom_linerange(aes(xmin = wa_mean - wa_sd,
+                     xmax = wa_mean + wa_sd),
+                alpha=0.25)+
+  geom_text_repel(data=wein_comparison %>% filter(variant %in% wein_outlier))+
   xlim(0.35,0.9)+
   ylim(0.35,0.9)+
   geom_smooth(method="lm")+
@@ -736,16 +764,117 @@ wein_plot <- ggplot(wein_comparison, aes(x=wa_mean, y=abundance_score_wein))+
   labs(x="CYP2C19\nWeighted Average",
        y="Zhang et al. 2020\nWeighted Average")
 
+wein_plot
+
 ggsave("../figures/wein_comparison.png", height=6, width=6, wein_plot)
+
+```
+
+### Barcode reliability check
+```{r}
+bc_level_df <- read_csv("../data/cyp2c19_vampseq_sequencing_data.csv") 
+
+length(unique(bc_level_df$barcode))
+
+bc_level_df <- bc_level_df %>% 
+  dplyr::select(-...1) %>% 
+  ungroup() %>% 
+  # Add "type" column with mutation type
+    mutate(type = case_when(
+    str_detect(parsed_var, "wt") ~ "wt",
+    str_detect(parsed_var, "syn") ~ "syn",
+    str_detect(parsed_var, "Ter") ~ "nonsense",
+    TRUE ~ "missense"
+  ))
+
+
+aa_oneLetter <- str_replace_all(bc_level_df$parsed_var, 
+            c(
+              "Ala"="A", "Arg" ="R", "Asn"="N", "Asp"="D",
+              "Cys"="C", "Glu"="E", "Gln"="Q", "Gly"="G",
+              "His"="H", "Ile"="I", "Leu"="L", "Lys"="K",
+              "Met"="M", "Phe"="F", "Pro"="P", "Ser"="S",
+              "Thr"="T", "Trp"="W", "Tyr"="Y", "Val"="V",
+              "Ter"="X"
+              )    
+            )
+
+bc_level_df$variant = aa_oneLetter
+bc_level_df$variant = str_remove(bc_level_df$variant, "\\[\\'")
+bc_level_df$variant = str_remove(bc_level_df$variant, "\\'\\]")
+bc_level_df$variant = unlist(bc_level_df$variant)
+
+
+bc_level_df <- bc_level_df %>% 
+  mutate(start = str_extract(variant, "[A-Z]"),
+         aa_loc = as.numeric(str_extract(variant, "\\d+")),
+         end = str_extract(variant, "(?<=\\d)[A-Z]")) %>% 
+  mutate(position = case_when(type == "syn" ~ ceiling(aa_loc/3),
+                              TRUE ~ aa_loc))
+```
+
+
+```{r}
+bc_outliers_counts <- bc_level_df %>% 
+  filter(variant %in% wein_outlier) %>%
+  select(replicate, sort, bin, barcode, variant, count) %>% 
+  group_by(variant, replicate, barcode, sort) %>%
+  summarise(total_count=sum(count)) %>% 
+  unique()
+
+bc_outliers <- bc_level_df %>% 
+  filter(variant %in% wein_outlier) %>%
+  select(barcode, variant) %>% 
+  unique() %>% 
+  group_by(variant) %>% 
+  summarise(num_barcodes = n())
+
+ggplot(bc_outliers, aes(x=variant, y=num_barcodes, label=num_barcodes))+
+  geom_col()+
+  geom_text(color="white",
+            vjust=1.3,
+            size=5,
+            fontface="bold")+
+  labs(y="Number of barcodes",
+       x="Variant")+
+  theme_light(base_size=22)
+
+ggsave("../figures/weinshilboum_outliers/bc_per_var.png", height=6, width=6)
+
+
+bc_outliers_experiments <- bc_level_df %>% 
+  filter(variant %in% wein_outlier) %>%
+  select(barcode, variant,replicate) %>% 
+  unique() %>% 
+  group_by(variant, replicate) %>% 
+  summarise(num_barcodes = n())
+
+bc_outliers_experiments_plot <- ggplot(bc_outliers_experiments, aes(x=variant, y=num_barcodes, label=num_barcodes, fill=replicate))+
+  geom_col(position = position_dodge())+
+  geom_text(color="white",
+            vjust=1.3,
+            size=5,
+            fontface="bold")+
+  labs(y="Barcodes detected",
+       x="Variant")+
+  scale_fill_manual(values=cbbPalette)+
+  theme_light(base_size=22)
+bc_outliers_experiments_plot
+ggsave(bc_outliers_experiments_plot, "../figures/weinshilboum_outliers/bc_per_rep.png", height=6, width=8)
 
 ```
 
 ## Assemble supp fig 3
 ```{r}
-supp_fig3 <- lib_histo_plt+wein_plot
-ggsave("../figures/supp_fig3.png", height=6, width=12, plot=supp_fig3)
-ggsave("../figures/supp_fig3.svg", height=6, width=12, plot=supp_fig3)
-
+supp_fig3_layout <- "
+  1111
+  2233
+"
+supp_fig3 <- lib_histo_plt+wein_plot+bc_outliers_experiments_plot+
+  plot_layout(design=supp_fig3_layout)
+supp_fig3
+ggsave("../figures/supp_fig3.png", height=12, width=14, plot=supp_fig3)
+ggsave("../figures/supp_fig3.svg", height=12, width=14, plot=supp_fig3)
 ```
 
 
@@ -817,7 +946,7 @@ ggplot(R144H_df, aes(x=abundance_score, y=geomean_norm, label=variant)) +
   labs(y="GFP:mCherry\n fluorescence",
        x="Abundance Score")+
   theme(axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
-?geom_smooth
+
 ggsave("../figures/r144h_validation/r144h_corrplot.png", height=4, width=5)
 ```
 
@@ -825,8 +954,8 @@ ggsave("../figures/r144h_validation/r144h_corrplot.png", height=4, width=5)
 ```{r}
 comb_fig1 <- lib_density_plt+validation_plt+missense_counts_plt+plot_layout(widths=c(1, 1, 1.25))
 comb_fig1
-ggsave(plot=comb_fig1, "../figures/fig1.svg", height=7, width=16)
-ggsave(plot=comb_fig1, "../figures/fig1.png", height=7, width=16)
+ggsave(plot=comb_fig1, "../figures/fig1_bottomPanel.svg", height=7, width=16)
+ggsave(plot=comb_fig1, "../figures/fig1_bottomPanel.png", height=7, width=16)
 ```
 
 
@@ -1035,7 +1164,7 @@ df_prep <- function(df, std_key, cons){
 
 ## Data wrangling
 ```{r}
-gricman_singleCons <- read_csv("../data/gricman_2014/Positions with Single Amino Acids Conserved in Over 80% of Sequences.csv")
+gricman_singleCons <- read_csv("../data/gricman_2014/Positions with Single Amino Acids Conserved in Over 80_ of Sequences.csv")
 gricman_aromatic <- read_csv("../data/gricman_2014/Conservation of Aromatic Amino Acids.csv")
 gricman_charged <- read_csv("../data/gricman_2014/Charged Amino Acids.csv")
 gricman_hbond <- read_csv("../data/gricman_2014/Hydrogen Bonding Amino Acids.csv")
@@ -1194,7 +1323,7 @@ ggsave(plot=dendrogram, "../figures/cyp2c19_fig2_dendrogram.svg", height=5, widt
 ### Plot pheatmap
 ```{r}
 breaks <- seq(0, 2, by=0.01)
-colors <- colorRampPalette(colors=c("blue", "white", "red"))(length(breaks))
+colors <- colorRampPalette(colors=c("#2166ac", "white", "#b2182b"))(length(breaks))
 cons_palette <- list(conservation = c(amino_acid = "#E69F00",
                 aromatic="#56B4E9",
                 positively_charged ="#009E73",
@@ -1216,7 +1345,8 @@ vert_pheatmap <- pheatmap(clustering_mat,
          na_col="grey50",
          # angle_col = 315,
          fontsize=14)
-# vert_pheatmap
+vert_pheatmap
+
 ```
 
 ```{r}
@@ -1234,7 +1364,7 @@ save_pheatmap_svg <- function(x, filename, width=10, height=5) {
   dev.off()
 }
 
-save_pheatmap_svg(vert_pheatmap, "../figures/clustering_vertical.svg", width=8, height=10)
+save_pheatmap_svg(vert_pheatmap, "../figures/clustering_vertical.svg", width=8, height=7)
 ```
 
 ## Median scores per cluster
@@ -1270,6 +1400,128 @@ ggsave("../figures/median_score_clusters.svg", height=3, width=20, plot=median_s
 
 ```
 
+## Cluster 5 analysis - CYP2C9 activity
+### Define 2C9 WT sequence
+```{r}
+## WT CYP2C9 sequence
+wt_CYP2C9 <- "MDSLVVLVLCLSCLLLLSLWRQSSGRGKLPPGPTPLPVIGNILQIGIKDISKSLTNLSKVYGPVFTLYFGLKPIVVLHGYEAVKEALIDLGEEFSGRGIFPLAERANRGFGIVFSNGKKWKEIRRFSLMTLRNFGMGKRSIEDRVQEEARCLVEELRKTKASPCDPTFILGCAPCNVICSIIFHKRFDYKDQQFLNLMEKLNENIKILSSPWIQICNNFSPIIDYFPGTHNKLLKNVAFMKSYILEKVKEHQESMDMNNPQDFIDCFLMKMEKEKHNQPSEFTIESLENTAVDLFGAGTETTSTTLRYALLLLLKHPEVTAKVQEEIERVIGRNRSPCMQDRSHMPYTDAVVHEVQRYIDLLPTSLPHAVTCDIKFRNYLIPKGTTILISLTSVLHDNKEFPNPEMFDPHHFLDEGGNFKKSKYFMPFSAGKRICVGEALAGMELFLFLTSILQNFNLKSLVDPKNLDTTPVVNGFASVPPFYQLCFIPV"
+
+## convert WT CYP2C9 sequence to tibble with position
+wt_CYP2C9_aa <- tibble(aa1 = t(str_extract_all(wt_CYP2C9, boundary("character"),
+                                           simplify = TRUE)),
+                    position = seq(1, nchar(wt_CYP2C9), by = 1)) %>%
+  # left_join(aa_type %>% dplyr::select(aa1), by = "aa1") #%>%
+  mutate(wt_aa1 = factor(aa1, levels = c("A", "V", "I", "L", "M", "F", "Y",
+                                      "W", "S", "T", "N", "Q", "C", "G",
+                                      "P", "R", "H", "K", "D", "E", "X")),
+         mut_aa1 = wt_aa1) %>%
+  group_by(position, wt_aa1) %>%
+  complete(mut_aa1) %>%
+  ungroup() %>%
+  dplyr::select(-aa1)
+
+write_csv(wt_CYP2C9_aa, "../data/wt_cyp2c9_aa.csv")
+
+
+# Read published CYP2C9 data from Amorosi et al, 2021
+CYP2C9_data <- read_csv("../data/2c9_abundance_activity_scores.csv") %>% 
+  dplyr::select(variant, class, start, position, end, abundance_score, abundance_sd, activity_score, activity_sd, abundance_class) 
+
+wt_CYP2C9_aa <- read_csv("../data/wt_cyp2c9_aa.csv")
+```
+
+### Intersect Cluster 5 positions with CYP2C9 dataset
+
+#### Check overall correlation of datasets
+```{r}
+CYP2C19_data_match2c9 <- CYP2C19_data %>% 
+  dplyr::select(variant, class = type, start, position, end, abundance_score, abundance_sd, abundance_class = classification) 
+
+cyp2c19_2c9_abundance_v_activity <- inner_join(CYP2C19_data, CYP2C9_data, by=c("position", "end"), suffix=c("_2C19", "_2C9"))
+
+# ggplot(CYP2C9_data, aes(x=abundance_score, y=activity_score))+
+#   geom_point()+
+#   stat_cor()
+
+cyp2c19_2c9_abund_v_act_plot <- ggplot(cyp2c19_2c9_abundance_v_activity, aes(x=abundance_score_2C19, y=activity_score))+
+  geom_pointdensity(size=3) +
+  geom_smooth(method="lm")+
+  stat_cor(digits=3, size=6,
+           label.x = 0,
+           label.y=1.4) +
+  labs(x="CYP2C19 Abundance scores",
+       y="CYP2C9 Activity scores",
+       color="Count")+
+  scale_color_viridis_c()+
+  theme(legend.position = "none")
+
+cyp2c19_2c9_abund_v_act_legend_plt <- ggplot(cyp2c19_2c9_abundance_v_activity, aes(x=abundance_score_2C19, y=activity_score))+
+  geom_pointdensity(size=3) +
+  geom_smooth(method="lm")+
+  stat_cor(digits=3, size=6,
+           label.x = 0,
+           label.y=1.4) +
+  labs(x="CYP2C19 Abundance scores",
+       y="CYP2C9 Activity scores",
+       color="Count")+
+  scale_color_viridis_c()
+
+cyp2c19_2c9_abund_v_act_plot_legend <- cowplot::get_legend(cyp2c19_2c9_abund_v_act_legend_plt)
+cyp2c19_2c9_abund_v_act_plot_legend
+cyp2c19_2c9_abund_v_act_plot
+
+ggsave(plot=cyp2c19_2c9_abund_v_act_plot, "../figures/cyp2c19_2c9_abund_v_act_plot.png", height=6, width=6)
+ggsave(plot=cyp2c19_2c9_abund_v_act_plot_legend, "../figures/cyp2c19_2c9_abund_v_act_legend.svg", height=3, width=2)
+```
+
+
+```{r}
+cluster5 <- annotation_df %>% filter(cluster ==5)
+  
+cluster5_cyp2c9 <- right_join(CYP2C9_data, cluster5, by="position")
+cluster5_cyp2c19 <- right_join(CYP2C19_data, cluster5, by="position")
+
+cluster5_cyp2c19_cyp2c9 <- inner_join(cluster5_cyp2c9, cluster5_cyp2c19, by="variant", suffix = c("_2C9", "_2C19"))
+
+
+cluster5_cyp2c19_cyp2c9_dodgeplot <- cluster5_cyp2c19_cyp2c9 %>% 
+  select(variant, position = position_2C9, activity_score_2C9 = activity_score, abundance_score_2C19) %>% 
+  pivot_longer(cols = c(activity_score_2C9, abundance_score_2C19), names_to = "data_source", values_to = "score") %>% 
+  mutate(data_source = case_when(str_detect(data_source, "2C19") ~ "2C19",
+                                 str_detect(data_source, "2C9") ~ "2C9")) 
+  
+cluster5_sd <- cluster5_cyp2c19_cyp2c9 %>% 
+  select(position = position_2C9, activity_sd_2C9 = activity_sd, abundance_sd_2C19, variant) %>% 
+  pivot_longer(cols = c(activity_sd_2C9, abundance_sd_2C19), names_to = "data_source", values_to = "std_dev") %>% 
+  mutate(data_source = case_when(str_detect(data_source, "2C19") ~ "2C19",
+                               str_detect(data_source, "2C9") ~ "2C9")) 
+
+
+cluster5_cyp2c19_cyp2c9_dodgeplot <- left_join(cluster5_cyp2c19_cyp2c9_dodgeplot, cluster5_sd, by=c("position", "data_source", "variant"))
+```
+
+### Plot
+```{r}
+set.seed(815)
+
+clust5_2c19abund_2c9activity_plot <- ggplot(cluster5_cyp2c19_cyp2c9_dodgeplot, aes(x=as.factor(position), y=score, color=data_source))+
+  geom_pointrange(aes(ymin=score - std_dev,
+                     ymax = score + std_dev),
+                  position=position_jitterdodge(jitter.width=0.25,
+                                          jitter.height=0),
+                  alpha=0.5)+
+  labs(x = "Position", y = "Score", color = "") +
+  scale_color_manual(labels = c("CYP2C19 abundance", "CYP2C9 activity"), values = c("#0072B2", "#D55E00"))+
+  theme(legend.position = "bottom",
+        legend.margin=margin(0,0,0,0))
+
+?theme
+
+clust5_2c19abund_2c9activity_plot
+ggsave(plot=clust5_2c19abund_2c9activity_plot, "../figures/clust5_2c19abund_2c9activity_plot.png", height=5, width=5.5)
+ggsave(plot=clust5_2c19abund_2c9activity_plot, "../figures/clust5_2c19abund_2c9activity_plot.svg", height=5, width=5.5)
+
+```
 
 # Figure 3: multiDMS joint analysis of CYP2C19 and 2C9
 ## Define 2C9 WT sequence
@@ -1296,7 +1548,7 @@ write_csv(wt_CYP2C9_aa, "../data/wt_cyp2c9_aa.csv")
 
 # Read published CYP2C9 data from Amorosi et al, 2021
 CYP2C9_data <- read_csv("../data/2c9_abundance_activity_scores.csv") %>% 
-  dplyr::select(variant, class, start, position, end, abundance_score, activity_score, abundance_class) 
+  dplyr::select(variant, class, start, position, end, abundance_score, abundance_sd, activity_score, activity_sd, abundance_class) 
 
 ```
 
@@ -1323,7 +1575,9 @@ corrplot_2C19_2C9 <- ggplot(CYP2C19_2C9_data, aes(x=abundance_score_2C19, y=abun
        y="CYP2C9 Abundance scores",
        color="Count")+
   scale_color_viridis_c()+
-  theme(plot.margin = margin(0,1,0.5,0,unit="in"))
+  theme(plot.margin = margin(0,1,0.5,0,unit="in"),
+        legend.position = "bottom",
+        legend.text = element_text(angle=-90))
 
 corrplot_2C19_2C9
 
@@ -1337,8 +1591,6 @@ corrplot_2C19_2C9
 ```{r}
 sweep <- read_csv("../data/cyp2c19_multiDMS_sweep_data.csv") %>% 
   rename(position = sites)
-
-
 
 sweep_tall <- sweep %>% 
   pivot_longer(cols = 5:18, names_to = "lasso", values_to = "shift")
@@ -1354,11 +1606,27 @@ lasso_order <- c("lasso_0.0_shift_C19", "lasso_1e-06_shift_C19", "lasso_1e-05_sh
 sweep_rep <- sweep_rep %>% 
   mutate(lasso_weight = factor(lasso_weight, lasso_order))
 
-sweep_replicate_mean <- sweep_rep %>% 
-  group_by(mutation, lasso_weight) %>% 
-  mutate(replicate_mean_shift = mean(c(Rep1, Rep2)))
+### Calculate position means and rolling sum for each multidms replicate
+mDMS_replicates_posMean <- sweep_rep %>% 
+  group_by(position, lasso_weight) %>% 
+  summarise(position_mean_shift_rep1 = mean(Rep1),
+            position_mean_shift_rep2 = mean(Rep2))
+
+rollsum_mDMS_rep1 <- mDMS_replicates_posMean %>% 
+  group_by(lasso_weight) %>% 
+  reframe(rolling_sum = rollsum(position_mean_shift_rep1, k=5, fill=NA),
+            position = position)
+
+rollsum_mDMS_rep2 <- mDMS_replicates_posMean %>% 
+  group_by(lasso_weight) %>% 
+  reframe(rolling_sum = rollsum(position_mean_shift_rep2, k=5, fill=NA),
+            position = position)
 
 ### Calculate position means and rolling sum
+sweep_replicate_mean <- sweep_rep %>% 
+  group_by(mutation, lasso_weight) %>% 
+  mutate(replicate_mean_shift = mean(c(Rep1, Rep2))) 
+
 sweep_position_mean <- sweep_replicate_mean %>% 
   select(-Rep1, -Rep2) %>% 
   group_by(lasso_weight, position) %>% 
@@ -1406,6 +1674,73 @@ ggsave(plot=rollsumofmean_sweep_plot, "../figures/rollsumofmean_sweep_plot.svg",
 ### Select 1e-05 as lasso weight that maximally reduces noise while leaving 
 ### enough signal for analysis
 ```
+
+```{r}
+# Rep 1
+rollsumofmean_mDMS_rep1_plot <- ggplot(mDMS_replicates_posMean %>% filter(lasso_weight == "lasso_1e-05_shift_C19"), aes(x=position, y=position_mean_shift_rep1))+
+  geom_line(data=rollsum_mDMS_rep1  %>% filter(lasso_weight == "lasso_1e-05_shift_C19"), mapping=aes(x=position, y=rolling_sum), color="black", linewidth=1.5, alpha=0.5)+
+  geom_point(size=3, alpha=0.65)+
+  # facet_wrap(~lasso_weight, labeller = labeller(lasso_weight = lasso_names)) + 
+  scale_x_continuous(breaks = c(1, 50, 100, 150, 200, 250, 300, 350, 400, 450, 490), 
+                     expand = c(0,0), 
+                     limits=c(1,490)) +
+  geom_hline(yintercept=0)+
+  labs(x="Position",
+       y="Shift values\n(multidms replicate 1)")+
+  theme(plot.margin = margin(0,0.5,0,0, "cm"),
+        legend.position = "none")
+
+rollsumofmean_mDMS_rep1_plot
+
+ggsave(plot=rollsumofmean_mDMS_rep1_plot, "../figures/rollsum/rollsumofmean_mDMS_rep1_k5.png", height=6, width=12)
+
+# Rep 2
+rollsumofmean_mDMS_rep2_plot <- ggplot(mDMS_replicates_posMean %>% filter(lasso_weight == "lasso_1e-05_shift_C19"), aes(x=position, y=position_mean_shift_rep2))+
+  geom_line(data=rollsum_mDMS_rep2  %>% filter(lasso_weight == "lasso_1e-05_shift_C19"), mapping=aes(x=position, y=rolling_sum), color="black", linewidth=1.5, alpha=0.5)+
+  geom_point(size=3, alpha=0.65)+
+  # facet_wrap(~lasso_weight, labeller = labeller(lasso_weight = lasso_names)) + 
+  scale_x_continuous(breaks = c(1, 50, 100, 150, 200, 250, 300, 350, 400, 450, 490), 
+                     expand = c(0,0), 
+                     limits=c(1,490)) +
+  geom_hline(yintercept=0)+
+  labs(x="Position",
+       y="Shift values\n(multidms replicate 2)")+
+  theme(plot.margin = margin(0,0.5,0,0, "cm"),
+        legend.position = "none")
+
+rollsumofmean_mDMS_rep2_plot
+
+ggsave(plot=rollsumofmean_mDMS_rep2_plot, "../figures/rollsum/rollsumofmean_mDMS_rep2_k5.png", height=6, width=12)
+
+
+mDMS_rep_correlation_plot <- ggplot(mDMS_replicates_posMean %>% filter(lasso_weight == "lasso_1e-05_shift_C19"), aes(x=position_mean_shift_rep1, y=position_mean_shift_rep2))+
+  geom_point(size=3, alpha=0.25)+
+  stat_cor(size=6)+
+  geom_smooth(method="lm")+
+  labs(x= "Shift values\n(multidms replicate 1)",
+       y= "Shift values\n(multidms replicate 2)")
+
+mDMS_rep_correlation_plot
+ggsave(plot = mDMS_rep_correlation_plot, "../figures/mDMS_reps_corrplot.png", height=7, width=7)
+```
+
+
+```{r}
+supp9_design <- "
+11#
+113
+223
+22#
+"
+
+supp9 <- rollsumofmean_mDMS_rep1_plot +
+  rollsumofmean_mDMS_rep2_plot +
+  mDMS_rep_correlation_plot +
+  plot_layout(design=supp8_design)
+
+ggsave(plot = supp8, "../figures/supp9.png", height=12, width=18)
+```
+
 
 ### Shift correlations across lasso weights
 ```{r}
@@ -1760,7 +2095,7 @@ ggsave("../figures/srs_plot.svg", plot=srs_plot,device="svg", height =2, width =
 ### Rolling sum of mean plot
 ```{r}
 rollsumofmean_plot <- ggplot(mDMS_heatmap_df_shifts_position_mean, aes(x=position, y=mean_shift))+
-  # geom_line(data=rollsumOfMean, mapping=aes(x=position, y=rolling_sum), color="black", size=1.5, alpha=0.5)+
+  geom_line(data=rollsumOfMean, mapping=aes(x=position, y=rolling_sum), color="black", size=1.5, alpha=0.5)+
   # geom_line(data=srs_tall_rollsumOfMean, mapping=aes(x=position, y=roll), color="orange", size=1.5, alpha=0.5)+
   geom_point(size=3, alpha=0.65)+
   geom_point(data=FDR_corrected %>% filter(mean_shift > 0), color="red")+
@@ -2063,7 +2398,7 @@ ggsave("../figures/fig3_bottom.png", height=6, width=15, unit="in", plot=fig3_bo
 ## Assemble figure 3
 ```{r}
 design_layout <- "
-  11111#22222
+  1111####222
   3333333333#
   44444444444
 "
@@ -2189,37 +2524,39 @@ wt_dfs <- full_join(wt_CYP2C9_df, wt_CYP2C19_df, by="position") %>%
 CYP2C19_to_2C9_reorg <- left_join(wt_dfs, CYP2C19_data %>% select(-type), by=c("position", "start_2c19" = "start")) %>% 
   mutate(measurement= "dms") %>% 
   filter(end == start_2c9) %>% 
-  select(position, start_2c19, start_2c9, abundance_score, classification, end, measurement)
+  select(position, start_2c19, start_2c9, abundance_score, abundance_sd, classification, end, measurement)
 
 # 2C19 to 2C9 fill-in variants from individual GFP:mCherry measurements
-filler_2c19 <- read_csv("../data/cyp2c19_to_2c9_individual_variants.csv") %>%
-  dplyr::rename(geometric_mean = `Geometric Mean (Ratio GFP:mCherry)`)
+filler_2c19 <- read_csv("../data/cyp2c19_to_cyp2c9_individual_variants_rep1.csv") %>% 
+  select(-well) %>% 
+  filter(variant != "R433W") %>% 
+  mutate(replicate = 1)
 
+## Add replicates 2-4 
+filler_2c19_reps2to4 <- read_csv("../data/cyp2c19_to_cyp2c9_individual_variants_reps2-4.csv") %>% 
+  filter(variant != "R433W") %>% 
+  select(-tube_name)
 
-filler_2c19 <- filler_2c19 %>% 
-  separate(sample, into=c("well", "variant", "ap1903"), sep="_") %>% 
-  mutate(ap1903 = replace_na(ap1903, "ap1903")) %>% 
-  filter(ap1903 == "ap1903") #%>% 
+filler_2c19_allreps <- rbind(filler_2c19, filler_2c19_reps2to4)
 
+filler_2c19_allreps_mean <- filler_2c19_allreps %>% 
+  group_by(variant) %>% 
+  reframe(geom_norm_avg = mean(geom_mean_norm),
+            geom_norm_sd = sd(geom_mean_norm))
 
-filler_2c19 <- filler_2c19 %>% 
-  mutate(mean_valid = geometric_mean / filler_2c19$geometric_mean[which(filler_2c19$variant == "2c19wt")])
-
-
-filler_2c19 <- filler_2c19 %>% 
-  filter(variant != "2c19wt",
-         variant != "R433W") %>% 
+filler_2c19_allreps_mean <- filler_2c19_allreps_mean %>% 
+  filter(!str_detect(variant, "wt")) %>% 
   mutate(aa_2C19 = str_extract(variant, "[A-Z]"),
          position = as.numeric(str_extract(variant, "\\d+")),
          aa_2C9 = str_extract(variant, "(?<=\\d)[A-Z]")) %>% 
   mutate(classification_meanNorm = case_when(
-    mean_valid <= nonsense_highest ~ "nonsense-like",
-    (mean_valid >= nonsense_highest) & (mean_valid <= synonymous_lowest) ~ "decreased",
-    mean_valid >= synonymous_lowest ~ "wt-like"
+    geom_norm_avg <= nonsense_highest ~ "nonsense-like",
+    (geom_norm_avg >= nonsense_highest) & (geom_norm_avg <= synonymous_lowest) ~ "decreased",
+    geom_norm_avg >= synonymous_lowest ~ "wt-like"
   ))
 
-filler_2c19_reorg <- filler_2c19 %>%
-  select(position, classification = classification_meanNorm, abundance_score = mean_valid, start_2c19=aa_2C19,start_2c9=aa_2C9) %>% 
+filler_2c19_reorg <- filler_2c19_allreps_mean %>%
+  select(position, classification = classification_meanNorm, abundance_score = geom_norm_avg, abundance_sd = geom_norm_sd, start_2c19=aa_2C19,start_2c9=aa_2C9) %>% 
   mutate(end = start_2c9,
          measurement = "individual") 
 
@@ -2239,7 +2576,7 @@ CYP2C19_to_2C9_secondHalf <- CYP2C19_to_2C9_reorg %>%
 
 ## Plot top and bottom halves
 ```{r}
-custom_colorscale = c("nonsense-like" = "#BB00FF","decreased" = "#3366ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
+custom_colorscale = list("nonsense-like" = "#BB00FF","decreased" = "#3366ff","possibly_wt-like" = "#ffcccc","wt-like" = "#F8766D")
 
 firstHalf <- ggplot(CYP2C19_to_2C9_firstHalf, aes(x=as.factor(position), y=abundance_score, fill=classification))+
   geom_point(size=3,
@@ -2248,25 +2585,29 @@ firstHalf <- ggplot(CYP2C19_to_2C9_firstHalf, aes(x=as.factor(position), y=abund
                filter(position <= 243), 
              size=3.5,
              shape=22)+
+  geom_linerange(aes(ymin = abundance_score - abundance_sd, 
+             ymax = abundance_score + abundance_sd)) +
   scale_x_discrete(labels=paste0(CYP2C19_to_2C9_firstHalf$start_2c19, "\n", CYP2C19_to_2C9_firstHalf$position, "\n", CYP2C19_to_2C9_firstHalf$start_2c9)) +
   ylim(0, 1.3)+
-  scale_fill_manual(labels=c("nonsense-like", "decreased", "possibly wt-like", "wt-like"), values=custom_colorscale)+
+  scale_fill_manual(labels=list("nonsense-like" = "nonsense-like", "decreased" = "decreased", "possibly_wt-like" = "possibly wt-like", "wt-like" = "wt-like"), values=custom_colorscale)+
   labs(x="",
      y="CYP2C19\nabundance score")
-# firstHalf
+firstHalf
 
-secondHalf <- ggplot(CYP2C19_to_2C9_secondHalf, aes(x=as.factor(position), y=abundance_score, fill=classification, label=measurement))+
+secondHalf <- ggplotsecondHalf <- ggplotsecondHalf <- ggplot(CYP2C19_to_2C9_secondHalf, aes(x=as.factor(position), y=abundance_score, fill=classification, label=measurement))+
   geom_point(size=3,
              shape=21) +
   geom_point(data=filler_2c19_reorg %>% filter(position > 243), 
              size=3.5,
            shape=22)+
+  geom_linerange(aes(ymin = abundance_score - abundance_sd, 
+               ymax = abundance_score + abundance_sd)) +
   ylim(0, 1.3)+
   scale_x_discrete(labels=paste0(CYP2C19_to_2C9_secondHalf$start_2c19, "\n", CYP2C19_to_2C9_secondHalf$position, "\n", CYP2C19_to_2C9_secondHalf$start_2c9))+
-  scale_fill_manual(values=custom_colorscale, labels=c("nonsense-like", "decreased", "possibly wt-like", "wt-like"))+
+  scale_fill_manual(values=custom_colorscale, labels=list("nonsense-like" = "nonsense-like", "decreased" = "decreased", "possibly_wt-like" = "possibly wt-like", "wt-like" = "wt-like"))+
   labs(x="Position",
        y="CYP2C19\nabundance score")
-# secondHalf
+secondHalf
 
 stacked <- firstHalf/secondHalf+plot_layout(guides="collect")&
   theme(legend.position = "bottom")
@@ -2278,33 +2619,64 @@ ggsave(plot=stacked,"../figures/2c19_to_2c9_panels.png", height=6, width=15)
 # Analyzing swaps of positions 241, 288, and 289
 ## Wrangle
 ```{r}
-cyp2c9_to_cyp2c19 <- read_csv("../data/cyp2c9_to_2c19_241-288-289.csv") %>% 
+### These have CYP2C19-->CYP2C9 swaps and CYP2C9-->CYP2C19 swaps
+### even though the variable name suggests only CYP2C9-->CYP2C19
+cyp2c9_to_cyp2c19_rep1 <- read_csv("../data/cyp2c9_to_2c19_241-288-289.csv") %>% 
   dplyr::rename(geometric_mean = `Geometric Mean`)
 
+cyp2c9_to_cyp2c19_rep1 <- cyp2c9_to_cyp2c19_rep1 %>% 
+  separate(sample, into=c("well", "template_cyp", "sample"), sep="_") %>% 
+  select(-Count, -well) %>% 
+  mutate(replicate=1)
+
+cyp2c9_to_cyp2c19_2c19_wt_rep1 <- mean(cyp2c9_to_cyp2c19_rep1$geometric_mean[which((cyp2c9_to_cyp2c19_rep1$sample == "WT") & cyp2c9_to_cyp2c19_rep1$template_cyp == "2C19")])
+
+cyp2c9_to_cyp2c19_2c9_wt_rep1 <- mean(cyp2c9_to_cyp2c19_rep1$geometric_mean[which((cyp2c9_to_cyp2c19_rep1$sample == "WT") & cyp2c9_to_cyp2c19_rep1$template_cyp == "2C9")])
+
+cyp2c9_to_cyp2c19_rep1 <- cyp2c9_to_cyp2c19_rep1 %>% 
+  mutate(mean_norm = case_when(template_cyp == "2C19" ~ geometric_mean / cyp2c9_to_cyp2c19_2c19_wt_rep1,
+                               template_cyp == "2C9" ~ geometric_mean / cyp2c9_to_cyp2c19_2c9_wt_rep1))
+
+
+cyp2c9_to_cyp2c19_reps2to4 <- read_csv("../data/cyp2c9_to_2c19_241-288-289_reps2to4.csv") %>% 
+  rename(sample = variant)
+
+cyp2c9_to_cyp2c19_2c19_wt_reps2to4 <- cyp2c9_to_cyp2c19_reps2to4 %>% 
+  filter(template_cyp == "2C19" & sample == "WT")
+
+cyp2c9_to_cyp2c19_2c19_wt_reps2to4_mean <- cyp2c9_to_cyp2c19_2c19_wt_reps2to4 %>% 
+  group_by(experiment) %>% 
+  summarise(geomean_avg = mean(geometric_mean))
+
+cyp2c9_to_cyp2c19_2c9_wt_reps2to4 <- cyp2c9_to_cyp2c19_reps2to4 %>% 
+  filter(template_cyp == "2C9" & sample == "WT")
+
+cyp2c9_to_cyp2c19_2c9_wt_reps2to4_mean <- cyp2c9_to_cyp2c19_2c9_wt_reps2to4 %>% 
+  group_by(experiment) %>% 
+  summarise(geomean_avg = mean(geometric_mean))
   
-cyp2c9_to_cyp2c19 <- cyp2c9_to_cyp2c19 %>% 
-  separate(sample, into=c("well", "template_cyp", "sample"), sep="_")
+cyp2c9_to_cyp2c19_reps2to4 <- cyp2c9_to_cyp2c19_reps2to4 %>% 
+  mutate(mean_norm = case_when(template_cyp == "2C19" & experiment == "experiment_2" ~
+                                 geometric_mean / cyp2c9_to_cyp2c19_2c19_wt_reps2to4_mean[1,2]$geomean_avg,
+                               template_cyp == "2C19" & experiment == "experiment_3" ~
+                                 geometric_mean / cyp2c9_to_cyp2c19_2c19_wt_reps2to4_mean[2,2]$geomean_avg,
+                               template_cyp == "2C9" & experiment == "experiment_2" ~ 
+                                 geometric_mean / cyp2c9_to_cyp2c19_2c9_wt_reps2to4_mean[1,2]$geomean_avg,
+                               template_cyp == "2C9" & experiment == "experiment_3" ~ 
+                                 geometric_mean / cyp2c9_to_cyp2c19_2c9_wt_reps2to4_mean[2,2]$geomean_avg))
 
-
-
-cyp2c9_to_cyp2c19_2c19_wt <- cyp2c9_to_cyp2c19$geometric_mean[which((cyp2c9_to_cyp2c19$sample == "WT") & cyp2c9_to_cyp2c19$template_cyp == "2C19")]
-cyp2c9_to_cyp2c19_2c9_wt <- cyp2c9_to_cyp2c19$geometric_mean[which((cyp2c9_to_cyp2c19$sample == "WT") & cyp2c9_to_cyp2c19$template_cyp == "2C9")]
-
-
-
-cyp2c9_to_cyp2c19 <- cyp2c9_to_cyp2c19 %>% 
-  mutate(mean_norm = case_when(template_cyp == "2C19" ~ geometric_mean / cyp2c9_to_cyp2c19_2c19_wt,
-                               template_cyp == "2C9" ~ geometric_mean / cyp2c9_to_cyp2c19_2c9_wt))
-
+cyp2c9_to_cyp2c19 <- rbind(cyp2c9_to_cyp2c19_rep1, cyp2c9_to_cyp2c19_reps2to4 %>% select(-experiment)) #%>% 
+  group_by(sample, template_cyp) %>% 
+  summarise(geomean_avg = mean(mean_norm),
+            geomean_sd = sd(mean_norm))
 
 template_2c9 <- cyp2c9_to_cyp2c19 %>% 
   filter(template_cyp == "2C9")
 
-variant_order_2c9 <- unique(template_2c9$sample)
+variant_order_2c9 <- c("WT", "K241E", "E288V", "N289I", "K241E-E288V", "K241E-N289I", "E288V-N289I", "K241E-E288V-N289I")
 
 template_2c9 <- template_2c9 %>% 
-  mutate(sample = fct_relevel(sample, variant_order_2c9))
-
+  mutate(sample = factor(sample, levels= variant_order_2c9))
 
 template_2c19 <- cyp2c9_to_cyp2c19 %>% 
   filter(template_cyp == "2C19")
@@ -2312,7 +2684,7 @@ template_2c19 <- cyp2c9_to_cyp2c19 %>%
 variant_order_2c19 <- c("WT", "E241K", "V288E", "I289N", "E241K-V288E", "E241K-I289N", "V288E-I289N", "E241K-V288E-I289N")
 
 template_2c19 <- template_2c19 %>% 
-  mutate(sample = fct_relevel(sample, variant_order_2c19))
+  mutate(sample = factor(sample, levels= variant_order_2c19))
 
 
 ```
@@ -2322,22 +2694,28 @@ template_2c19 <- template_2c19 %>%
 colors <- list("2C9" = "#D55E00",
                "2C19" = "#0072B2")
 
-swaps_plot_template_2c9<- ggplot(template_2c9, aes(x=sample, y=mean_norm))+
+swaps_plot_template_2c9<- ggplot(template_2c9, aes(x=sample, y=geomean_avg))+
   geom_col(position="dodge",
            fill="#D55E00")+
+  geom_linerange(aes(ymin = geomean_avg - geomean_sd, 
+               ymax = geomean_avg + geomean_sd)) +
   labs(y="Fluorescence\n(GFP:mCherry)",
        x="Variant")+
-  theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
         legend.position = "top",
         strip.text = element_text(size=18))
 swaps_plot_template_2c9
 
-swaps_plot_template_2c19<- ggplot(template_2c19, aes(x=sample, y=mean_norm))+
+swaps_plot_template_2c19<- ggplot(template_2c19, aes(x=sample, y=geomean_avg))+
   geom_col(position="dodge",
            fill="#0072B2")+
+  geom_linerange(aes(ymin = geomean_avg - geomean_sd, 
+             ymax = geomean_avg + geomean_sd)) +
   labs(y="Fluorescence\n(GFP:mCherry)",
        x="Variant")+
-  theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
         legend.position = "top",
         strip.text = element_text(size=18))
 swaps_plot_template_2c19
@@ -2347,32 +2725,313 @@ swaps_plot <- swaps_plot_template_2c19+swaps_plot_template_2c9
 swaps_plot
 ```
 
+# FoldX saturation mutagenesis ddG
+## CYP2C19
+### data
 ```{r}
-# swaps_plot_template_2c9_triple <- ggplot(template_2c9 %>% filter(well %in% c("A1", "B2")), aes(x=sample, y=mean_norm))+
-#   geom_col(position="dodge",
-#            fill="#D55E00")+
-#   labs(y="Fluorescence\n(GFP:mCherry)",
-#        x="Variant")+
-#   theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
-#         legend.position = "top",
-#         strip.text = element_text(size=18))
-# swaps_plot_template_2c9_triple
-# 
-# ggsave("../figures/swaps_2c9_triple.png", height=7, width=4)
-# 
-# 
-# swaps_plot_template_2c19_triple<- ggplot(template_2c19 %>% filter(well %in% c("C1", "B5")), aes(x=sample, y=mean_norm))+
-#   geom_col(position="dodge",
-#            fill="#0072B2")+
-#   labs(y="Fluorescence\n(GFP:mCherry)",
-#        x="Variant")+
-#   theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1),
-#         legend.position = "top",
-#         strip.text = element_text(size=18))
-# swaps_plot_template_2c19_triple
-# 
-# ggsave("../figures/swaps_2c19_triple.png", height=7, width=4)
+foldx_mean_cyp2c19 <- read_csv("../data/foldx_mean_4gqs.csv")
+
+# Remove below 2nd and above 98th percentile for visualization
+foldx_mean_cyp2c19_2nd <- quantile(foldx_mean_cyp2c19$mean_ddg, 0.02)
+foldx_mean_cyp2c19_98th <- quantile(foldx_mean_cyp2c19$mean_ddg, 0.98)
+
+foldx_mean_cyp2c19_plotting <- foldx_mean_cyp2c19 %>% 
+  filter(mean_ddg > foldx_mean_cyp2c19_2nd & mean_ddg < foldx_mean_cyp2c19_98th)
+
+### Combine with VAMPseq
+cyp2c19_foldx_vampseq_alldata <- inner_join(foldx_mean_cyp2c19, CYP2C19_data %>% select(variant, abundance_score, abundance_sd), by="variant") %>% 
+  na.omit()
+
+### Combine with VAMPseq for plotting
+cyp2c19_foldx_vampseq_plotting <- inner_join(foldx_mean_cyp2c19_plotting, CYP2C19_data, by="variant") %>%
+  na.omit()
 ```
+
+
+
+### Linear model for mean ddG ~ abundance score
+```{r}
+cyp2c19_lm <- stats::lm(data=cyp2c19_foldx_vampseq_alldata %>% select(mean_ddg, abundance_score), mean_ddg ~ abundance_score) 
+
+cyp2c19_ddG_predict <- data.frame(abundance_score=0.5)
+
+cyp2c19_ddG_abund0.5 <- predict(cyp2c19_lm, cyp2c19_ddG_predict)
+```
+
+### Correlation plot foldx vs VAMP-seq
+```{r}
+foldx_vampseq_cyp2c19_corrplot <- ggplot(cyp2c19_foldx_vampseq_plotting, aes(x=mean_ddg, y=abundance_score))+
+  geom_point(alpha=0.15, 
+             size=2)+
+  geom_linerange(aes(xmin = mean_ddg - mean_sd, xmax = mean_ddg + mean_sd),
+                 alpha=0.1)+
+  geom_linerange(aes(ymin = abundance_score - abundance_sd, ymax = abundance_score + abundance_sd),
+                 alpha=0.1)+
+  geom_smooth(method="lm")+
+  stat_cor(size=4)+
+  labs(x=expression(~Delta~Delta~"G"),
+       y="Abundance score")
+
+ggsave(plot=foldx_vampseq_cyp2c19_corrplot, filename="../figures/foldx_figures/foldx_vampseq_cyp2c19_corrplot.png", height=5, width=6)
+
+### Plotting with all data
+foldx_vampseq_cyp2c19_corrplot_alldata <- ggplot(cyp2c19_foldx_vampseq_alldata, aes(x=abundance_score, y=mean_ddg))+
+ geom_pointdensity(size=3) +
+  geom_smooth(method="lm",
+              color="darkorange3")+
+  stat_cor(digits=3, size=6) +
+  geom_segment(aes(x=0.5, xend=0.5,
+                   y=min(mean_ddg), yend=cyp2c19_ddG_abund0.5),
+               linetype="dashed",
+               size=1)+
+  geom_segment(aes(x=min(abundance_score), xend=0.5,
+                   y=cyp2c19_ddG_abund0.5, yend=cyp2c19_ddG_abund0.5),
+               linetype="dashed",
+               size=1)+
+  labs(y=expression(atop(~Delta~Delta~"G", paste("\n(kcal/mol)"))),
+       x="CYP2C19\nAbundance score",
+       color="Count")+
+  xlim(min(cyp2c19_foldx_vampseq_alldata$abundance_score-0.1),
+       max(cyp2c19_foldx_vampseq_alldata$abundance_score))+
+
+  scale_color_viridis_c()
+
+foldx_vampseq_cyp2c19_corrplot_alldata
+
+ggsave(plot=foldx_vampseq_cyp2c19_corrplot_alldata, filename="../figures/foldx_figures/foldx_vampseq_cyp2c19_corrplot_alldata.png", height=5, width=6)
+
+```
+
+### CYP2C19 --> CYP2C9 swaps
+```{r}
+foldx_swaps_2c19 <- read_csv("../data/foldx_2c19_swaps.csv")
+
+## Add WT placeholder
+foldx_wt_placeholder <- data.frame(mean_sd = 0, mean_ddg=0, variant="WT")
+
+foldx_swaps_2c19 <- rbind(foldx_swaps_2c19, foldx_wt_placeholder)
+
+order_2c19 <- c("WT", "E241K", "V288E", "I289N", "E241K,V288E","E241K,I289N", "V288E,I289N", "E241K,V288E,I289N")
+foldx_swaps_2c19 <- foldx_swaps_2c19 %>% 
+  mutate(variant = factor(variant, levels=order_2c19),
+         pred_effect = case_when(
+           mean_ddg < 0 ~ "stabilizing",
+           mean_ddg > 0 & mean_ddg < cyp2c19_ddG_abund0.5 ~ "destabilizing",
+           mean_ddg >= cyp2c19_ddG_abund0.5 ~ "severely_destabilizing",
+           mean_ddg == 0 ~ "WT"
+         ))
+```
+
+```{r}
+swaps_predAbund_labs <- list("destabilizing" = "Destabilizing",
+                             "severely_destabilizing" = "Severely destabilizing",
+                             "stabilizing" = "Stabilizing")
+
+cyp2c19_swaps_ddg_plot <- ggplot(foldx_swaps_2c19, aes(x=variant, y=mean_ddg, color=pred_effect))+
+  geom_point(size=4,
+             aes(fill=pred_effect),
+             color="black",
+             shape=21)+
+  geom_linerange(aes(ymin=mean_ddg - mean_sd, ymax=mean_ddg + mean_sd), color="black")+
+  geom_hline(yintercept=0)+
+  geom_hline(yintercept=cyp2c19_ddG_abund0.5,
+             linetype="dashed")+
+  scale_fill_manual(values=list(stabilizing="red",
+                               destabilizing = "lightblue",
+                               severely_destabilizing="blue",
+                               WT = "black"),
+                    labels=swaps_predAbund_labs)+
+  labs(y=expression(atop(~Delta~Delta~"G", paste("\n(kcal/mol)"))),
+       fill="Predicted abundance classification")+
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        axis.title.x = element_blank(),
+        legend.position="none")
+```
+
+
+
+## CYP2C9
+### data
+```{r}
+foldx_mean_cyp2c9 <- read_csv("../data/foldx_mean_1og2.csv") 
+
+# Remove below 2nd and above 98th percentile for visualization
+foldx_mean_cyp2c9_2nd <- quantile(foldx_mean_cyp2c9$mean_ddg, 0.02)
+foldx_mean_cyp2c9_98th <- quantile(foldx_mean_cyp2c9$mean_ddg, 0.98)
+
+foldx_mean_cyp2c9_plotting <- foldx_mean_cyp2c9 %>% 
+  filter(mean_ddg > foldx_mean_cyp2c9_2nd & mean_ddg < foldx_mean_cyp2c9_98th)
+
+### Combine with VAMPseq
+cyp2c9_foldx_vampseq_alldata <- inner_join(foldx_mean_cyp2c9, CYP2C9_data %>% select(variant, abundance_score, abundance_sd), by="variant") %>% 
+  na.omit()
+
+### Combine with VAMPseq for plotting
+cyp2c9_foldx_vampseq_plotting <- inner_join(foldx_mean_cyp2c9_plotting, CYP2C9_data, by="variant") %>%
+  na.omit()
+```
+
+### Linear model for mean ddG ~ abundance score
+```{r}
+cyp2c9_lm <- lm(data=cyp2c9_foldx_vampseq_alldata, mean_ddg ~ abundance_score) 
+
+cyp2c9_ddG_predict <- data.frame(abundance_score=0.5)
+
+cyp2c9_ddG_abund0.5 <- predict(cyp2c9_lm, cyp2c9_ddG_predict)
+```
+
+
+### Correlation plot foldx vs VAMP-seq
+```{r}
+foldx_vampseq_cyp2c9_corrplot <- ggplot(cyp2c9_foldx_vampseq_plotting, aes(x=mean_ddg, y=abundance_score))+
+  geom_point(alpha=0.15, 
+             size=2)+
+  geom_linerange(aes(xmin = mean_ddg - mean_sd, xmax = mean_ddg + mean_sd),
+                 alpha=0.1)+
+  geom_linerange(aes(ymin = abundance_score - abundance_sd, ymax = abundance_score + abundance_sd),
+                 alpha=0.1)+
+  geom_smooth(method="lm")+
+  stat_cor(size=4)+
+  labs(x=expression(~Delta~Delta~"G"),
+       y="Abundance score")
+foldx_vampseq_cyp2c9_corrplot
+ggsave(plot=foldx_vampseq_cyp2c9_corrplot, filename="../figures/foldx_figures/foldx_vampseq_cyp2c9_corrplot.png", height=5, width=6)
+
+### Plotting with all data
+foldx_vampseq_cyp2c9_corrplot_alldata <- ggplot(cyp2c9_foldx_vampseq_alldata, aes(x=abundance_score, y=mean_ddg))+
+ geom_pointdensity(size=3) +
+  geom_smooth(method="lm",
+              color="darkorange3")+
+  stat_cor(digits=3, size=6) +
+  geom_segment(aes(x=0.5, xend=0.5,
+                   y=min(mean_ddg), yend=cyp2c9_ddG_abund0.5),
+               linetype="dashed",
+               size=1)+
+  geom_segment(aes(x=min(abundance_score), xend=0.5,
+                   y=cyp2c9_ddG_abund0.5, yend=cyp2c9_ddG_abund0.5),
+               linetype="dashed",
+               size=1)+
+  labs(y=expression(atop(~Delta~Delta~"G", paste("\n(kcal/mol)"))),
+       x="CYP2C9\nAbundance score",
+       color="Count")+
+  xlim(min(cyp2c9_foldx_vampseq_alldata$abundance_score-0.1), max(cyp2c9_foldx_vampseq_alldata$abundance_score))+
+  scale_color_viridis_c()
+foldx_vampseq_cyp2c9_corrplot_alldata
+
+ggsave(plot=foldx_vampseq_cyp2c9_corrplot_alldata, filename="../figures/foldx_figures/foldx_vampseq_cyp2c9_corrplot_alldata.png", height=5, width=6)
+
+```
+
+### CYP2C9 --> CYP2C19 swaps
+```{r}
+foldx_swaps_2c9 <- read_csv("../data/foldx_2c9_swaps.csv")
+
+## Add WT placeholder
+foldx_wt_placeholder <- data.frame(mean_sd = 0, mean_ddg=0, variant="WT")
+
+foldx_swaps_2c9 <- rbind(foldx_swaps_2c9, foldx_wt_placeholder)
+
+order_2c9 <- c("WT", "K241E", "E288V", "N289I", "K241E,E288V","K241E,N289I", "E288V,N289I", "K241E,E288V,N289I")
+foldx_swaps_2c9 <- foldx_swaps_2c9 %>% 
+  mutate(variant = factor(variant, levels=order_2c9),pred_effect = case_when(
+           mean_ddg < 0 ~ "stabilizing",
+           mean_ddg > 0 & mean_ddg < cyp2c9_ddG_abund0.5 ~ "destabilizing",
+           mean_ddg >= cyp2c9_ddG_abund0.5 ~ "severely_destabilizing",
+           mean_ddg == 0 ~ "WT"
+         ))
+
+```
+
+```{r}
+swaps_predAbund_labs <- list("destabilizing" = "Destabilizing",
+                             "severely_destabilizing" = "Severely destabilizing",
+                             "stabilizing" = "Stabilizing",
+                             "WT"="WT")
+
+cyp2c9_swaps_ddg_plot <- ggplot(foldx_swaps_2c9, aes(x=variant, y=mean_ddg, color=pred_effect))+
+  geom_point(size=4,
+             aes(fill=pred_effect),
+             color="black",
+             shape=21)+
+  geom_linerange(aes(ymin=mean_ddg - mean_sd, ymax=mean_ddg + mean_sd), color="black")+
+  geom_hline(yintercept=0)+
+  geom_hline(yintercept=cyp2c9_ddG_abund0.5,
+             linetype="dashed")+
+  scale_fill_manual(values=list(stabilizing="red",
+                               destabilizing = "lightblue",
+                               severely_destabilizing="blue",
+                               WT="black"),
+                    labels=swaps_predAbund_labs)+
+  labs(y=expression(atop(~Delta~Delta~"G", paste("\n(kcal/mol)"))),
+       fill="Predicted abundance classification")+
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        axis.title.x = element_blank(),
+        legend.position="none")
+```
+
+#### Get legend separately
+```{r}
+cyp2c9_swaps_ddg_legend_plot <- ggplot(foldx_swaps_2c9, aes(x=variant, y=mean_ddg, color=pred_effect))+
+  geom_point(size=4,
+             aes(fill=pred_effect),
+             color="black",
+             shape=21)+
+  geom_linerange(aes(ymin=mean_ddg - mean_sd, ymax=mean_ddg + mean_sd), color="black")+
+  geom_hline(yintercept=0)+
+  geom_hline(yintercept=cyp2c9_ddG_abund0.5,
+             linetype="dashed")+
+  scale_fill_manual(values=list(stabilizing="red",
+                               destabilizing = "lightblue",
+                               severely_destabilizing="blue",
+                               WT="black"),
+                    labels=swaps_predAbund_labs)+
+  labs(y=expression(atop(~Delta~Delta~"G", paste("\n(kcal/mol)"))),
+       fill="Predicted abundance classification")+
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        axis.title.x = element_blank(),
+        legend.position="bottom")
+
+
+cyp2c9_swaps_ddg_legend <- cowplot::get_legend(cyp2c9_swaps_ddg_legend_plot)
+ggsave(plot=cyp2c9_swaps_ddg_legend, "../figures/swaps_legend.svg", height=2, width=18)
+
+```
+
+## Combine swap ddg plots
+```{r}
+swaps_ddg_plot <- cyp2c19_swaps_ddg_plot+cyp2c9_swaps_ddg_plot
+```
+
+
+<!--## Correlation of swap abundance and foldx
+```{r}
+foldx_swaps_2c19 <- foldx_swaps_2c19 %>% 
+  mutate(protein = "cyp2c19")
+
+foldx_swaps_2c9 <- foldx_swaps_2c9 %>% 
+  mutate(protein = "cyp2c9")
+
+template_2c19 <- template_2c19 %>% 
+  mutate(protein = "cyp2c19")
+
+template_2c9 <- template_2c9 %>% 
+  mutate(protein = "cyp2c9")
+
+
+
+foldx_swaps <- rbind(foldx_swaps_2c19, foldx_swaps_2c9) %>% 
+  mutate(variant = gsub(x=variant,pattern = ",", replacement="-"))
+abundance_swaps <- rbind(template_2c19,template_2c9)
+
+swaps_abundance_foldx <- full_join(foldx_swaps, abundance_swaps, by=c("variant" = "sample", "protein"))
+
+ggplot(swaps_abundance_foldx, aes(x=mean_ddg, y=mean_norm))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  stat_cor()+
+  facet_wrap(~ protein)
+```
+-->
 
 
 # Assemble Fig 4
@@ -2383,8 +3042,9 @@ fig4_layout <- "
   #####
   #####
   33333
+  44444
 "
-fig4 <- stacked/swaps_plot+
+fig4 <- stacked+swaps_plot+swaps_ddg_plot+
   plot_layout(design=fig4_layout)
 fig4
 ggsave("../figures/fig4.png", plot=fig4, height=16, width=14, unit="in")
